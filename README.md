@@ -36,7 +36,7 @@ Following the self-supervised training, we can then obtain the pseudo masks usin
 ```
 python main_monuseg.py --mode 'generate_label' --model 'model_path'
 ```
-![](https://github.com/cpystann/PSM/raw/master/pics/fig1.png)
+![](https://github.com/cpystann/PSM/raw/master/pics/fig.jpg)
 
 ### Train NDN
 ```
