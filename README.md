@@ -2,7 +2,7 @@ PSM
 ====
 Exploring Label-free Cell Recognition with Prior Self-activation Maps， MICCAI 2023
 ------
- <img src="https://github.com/cpystan/PSM-MICCAI/blob/master/pics/framework.png" width = "80%" height = "80%" alt="framework" align=center />
+ <img src="https://github.com/cpystan/PSM/blob/master/pics/framework.png" width = "80%" height = "80%" alt="framework" align=center />
 
 **MoNuSeg dataset**
 
@@ -50,7 +50,7 @@ Following the self-supervised training, we can then obtain the pseudo masks usin
 python main_monuseg.py --mode 'generate_label' --model 'model_path'
 ```
 
- <img src="https://github.com/cpystan/Prior-Self-activation-Map/blob/master/pics/fig.jpg" width = "60%" height = "60%" alt="self-activation map vs. pseudo mask" align=center />
+ <img src="https://github.com/cpystan/PSM/blob/master/pics/fig.jpg" width = "60%" height = "60%" alt="self-activation map vs. pseudo mask" align=center />
  
 demo of the PSM and its pseudo label after clustering
 
