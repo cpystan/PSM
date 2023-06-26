@@ -2,7 +2,7 @@ PSM
 ====
 Exploring Label-free Cell Recognition with Prior Self-activation Maps， MICCAI 2023
 ------
- <img src="https://github.com/cpystan/Prior-Self-activation-Map/blob/master/pics/framework.png" width = "80%" height = "80%" alt="framework" align=center />
+ <img src="https://github.com/cpystan/PSM-MICCAI/blob/master/pics/framework.png" width = "80%" height = "80%" alt="framework" align=center />
 Arrange your MoNuSeg dataset:
  
 ```
