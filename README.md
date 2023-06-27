@@ -1,6 +1,6 @@
 PSM
 ====
-Exploring Label-free Cell Recognition with Prior Self-activation Maps， MICCAI 2023
+Exploring Unsupervised Cell Recognition with Prior Self-activation Maps， MICCAI 2023
 ------
  <img src="https://github.com/cpystan/PSM/blob/master/pics/framework.png" width = "80%" height = "80%" alt="framework" align=center />
 
