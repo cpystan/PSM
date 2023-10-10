@@ -71,3 +71,22 @@ python main_monuseg.py --mode 'train_final_stage'
 ```
 python main_monuseg.py --mode 'test' --model 'model_path'
 ```
+
+### Citation
+```
+@InProceedings{10.1007/978-3-031-43993-3_54,
+author="Chen, Pingyi
+and Zhu, Chenglu
+and Shui, Zhongyi
+and Cai, Jiatong
+and Zheng, Sunyi
+and Zhang, Shichuan
+and Yang, Lin",
+sed Cell Recognition with Prior Self-activation Maps",
+booktitle="Medical Image Computing and Computer Assisted Intervention -- MICCAI 2023",
+year="2023",
+publisher="Springer Nature Switzerland",
+address="Cham",
+pages="559--568",
+}
+```
