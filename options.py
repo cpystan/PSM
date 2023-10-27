@@ -24,9 +24,9 @@ parser.add_argument('--cudnn', type=str, default='True',
                     help='set cudnn')
 
 # Data specifications
-parser.add_argument('--data_train', type=str, default='/data2/chenpy/point_seg/Public_MoNuSeg/MoNuSeg 2018 Training Data',
+parser.add_argument('--data_train', type=str, default='./MoNuSeg_2018_Training_Data',
                     help='train dataset')
-parser.add_argument('--data_test', type=str, default='/data2/chenpy/point_seg/Public_MoNuSeg/MoNuSegTestData',
+parser.add_argument('--data_test', type=str, default='./MoNuSegTestData',
                     help='test dataset')
 parser.add_argument('--crop_edge_size', type=int, default=512,
                     help='crop edge size')
@@ -36,7 +36,7 @@ parser.add_argument('--rgb_range', type=int, default=255,
                     help='maximum value of RGB')
 
 # Model specifications
-parser.add_argument('--model', default='./checkpoint/self_stage_net_best.pth',
+parser.add_argument('--model', default='/self_stage_net_best.pth',
                     help='model name')
 parser.add_argument('--shift_mean', default=True,
                     help='subtract pixel mean from the input')

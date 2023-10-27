@@ -64,7 +64,7 @@ def psm_for_seg(x,y,model,args,tag):
     elif tag == 'train_set':
         path = args.data_train + '/Tissue Images/' + x
     transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.CenterCrop(256)])
+                                    transforms.CenterCrop(512)])
 
     image = Image.open(path).convert('RGB')
 
@@ -81,10 +81,10 @@ def psm_for_seg(x,y,model,args,tag):
 
 
     rgb_img = cv2.imread(path)[:, :, ::-1]
-    rgb_img = rgb_img[372:628,372:628]
+    rgb_img = rgb_img[244:756,244:756]
     rgb_img = np.float32(rgb_img) / 255
 
-    cam_image,cam_color= sgg(rgb_img, grayscale_cam_pos,x,0.5)
+    cam_image,cam_color= sgg(rgb_img, grayscale_cam_pos,x,1)
 
     cam_images = copy.deepcopy(cam_image)
     cam_images = morphology.remove_small_objects(cam_images, 200)
@@ -107,5 +107,9 @@ def psm_for_seg(x,y,model,args,tag):
 
     cv2.imwrite(os.path.join(save_dir,basename+'_pos.png'), cam_image_positive)
     cv2.imwrite(os.path.join(save_dir, basename + '_heat.png'), cam_color)
-
+    cv2.imwrite(os.path.join(save_dir, basename + '_original.png'), np.uint8(rgb_img*255))
+    if tag == 'test_set':
+        gt_img = cv2.imread(os.path.join(args.data_test,basename+'_binary.png'),cv2.IMREAD_GRAYSCALE)
+        gt_img = gt_img[244:756,244:756]
+        cv2.imwrite(os.path.join(save_dir, basename + '_gt.png'), gt_img)
     return

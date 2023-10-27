@@ -44,16 +44,7 @@ def sgg(img: np.ndarray,
     :returns: The default image with the cam overlay.
     """
     mask = mask.transpose(1,2,0)
-    '''
-    edge_mp =  mask + beta * img
-    edge_mp = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    edge_mp = edge_mp/np.max(edge_mp)*255
-    x = cv2.Sobel(edge_mp,cv2.CV_16S,1,0)
-    y = cv2.Sobel(edge_mp,cv2.CV_16S,0,1)
-    absX = cv2.convertScaleAbs(x)
-    absY = cv2.convertScaleAbs(y)
-    dst = cv2.addWeighted(absX, 0.5, absY, 0.5, 0 )
-    '''
+
 
     heatmap = cv2.applyColorMap(np.uint8(255 * (mask)) ,colormap)
 
@@ -70,7 +61,7 @@ def sgg(img: np.ndarray,
             "The input image should np.float32 in the range [0, 1]")
 
     cam = 1*heatmap + beta*img
-    cam_color = np.uint8(255*((heatmap+0*img)/np.max(heatmap+0*img)))
+    cam_color = np.uint8(255*((heatmap+beta*img)/np.max(heatmap+beta*img)))
 
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TermCriteria_MAX_ITER, 20, 0.5)
@@ -79,20 +70,20 @@ def sgg(img: np.ndarray,
     output = output.reshape((cam.shape[0],cam.shape[1]))
 
     mask1 = np.expand_dims((output == 0),axis=2)
-    ave_vector1= np.sum(mask1*cam_color*255,axis=(0,1))/np.sum(mask1)
+    ave_vector1= np.sum(mask1*cam*255,axis=(0,1))/np.sum(mask1)
 
     mask2 = np.expand_dims((output == 1),axis=2)
-    ave_vector2= np.sum(mask2*cam_color*255,axis=(0,1))/np.sum(mask2)
+    ave_vector2= np.sum(mask2*cam*255,axis=(0,1))/np.sum(mask2)
 
     mask3 = np.expand_dims((output == 2),axis=2)
-    ave_vector3= np.sum(mask3*cam_color*255,axis=(0,1))/np.sum(mask3)
+    ave_vector3= np.sum(mask3*cam*255,axis=(0,1))/np.sum(mask3)
 
     #color prior
-    ave_feature= np.array([ave_vector1[1],ave_vector2[1],ave_vector3[1]])
+    ave_feature= np.array([ave_vector1[1]+ave_vector1[0],ave_vector2[1]+ave_vector2[0],ave_vector3[1]+ave_vector3[0]])
     vectors = np.array([mask1,mask2,mask3])
     sorted_indices = np.argsort(ave_feature)
     #ave_features = vectors[sorted_indices,:,:,:]
-    fg_id = sorted_indices[-1]
+    fg_id = sorted_indices[0]
     output = vectors[fg_id,:,:,:].squeeze(2)*1
 
 

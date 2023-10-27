@@ -47,8 +47,9 @@ def create_Voronoi_label(label_points,shape):
         # fuse Voronoi edge and dilated points
     label_point_dilated = morphology.dilation(label, morphology.disk(2))
     label_vor = np.zeros((h, w, 3), dtype=np.uint8)
-    label_vor[:, :, 0] = (edges > 0).astype(np.uint8) * 255
+    label_vor[:, :, 0] = ((edges > 0)* (label_point_dilated==0)).astype(np.uint8) * 255
     label_vor[:, :, 1] = (label_point_dilated > 0).astype(np.uint8) * 120
+    tmp = label_vor[:, :, 0]+label_vor[:, :, 1]
 
     return label_vor[:, :, 0]+label_vor[:, :, 1]
 

@@ -5,6 +5,9 @@ import numpy as np
 import copy
 
 
+
+
+
 def peak_point(output_i, thresh,bp_shresh):
 
 
@@ -12,7 +15,7 @@ def peak_point(output_i, thresh,bp_shresh):
 
     min_d = 6
 
-    output_i = cv2.GaussianBlur(output_i, (25, 25), 0)
+    output_i = cv2.GaussianBlur(output_i, (13, 13), 0)
 
     bp = copy.deepcopy(output_i)
     output_i[output_i < 0.5] = 0

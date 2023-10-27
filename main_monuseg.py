@@ -45,7 +45,8 @@ def crop(x, size):
     H = int(h / 2 - size / 2)
     W = int(w / 2 - size / 2)
     o = x[:, :, H:H + size, W:W + size]
-    o = o.contiguous()
+    if isinstance(o,torch.Tensor):
+        o = o.contiguous()
     return o
 
 def crop_random(x,size):
@@ -71,7 +72,7 @@ def preProcess_train(x ,y,args):
         if args.mode in ('train_second_stage' , 'generate_voronoi', 'train_final_stage'):
             path1 = '/'.join(args.data_train.split('/')[:-1])+ '/data_second_stage_train/' + x_data
             path2 = '/'.join(args.data_train.split('/')[:-1])+ '/data_second_stage_train/' + y_data
-            path_edge = '/'.join(args.data_train.split('/')[:-1]) + '/data_second_stage_train/' + y_data.split('_')[-2] + '_edge.png'
+
             if args.mode == 'train_final_stage':
                 path_edge = '/'.join(args.data_train.split('/')[:-1]) + '/data_second_stage_train/' + y_data.split('_')[-2] + '_vor.png'
 
@@ -79,7 +80,7 @@ def preProcess_train(x ,y,args):
         x_data, y_data = torch.from_numpy(x_data).unsqueeze(0) , torch.from_numpy(y_data).unsqueeze(0).unsqueeze(3)
         input.append(x_data)
         label.append(y_data)
-        if args.mode in ('train_second_stage' , 'generate_voronoi', 'train_final_stage'):
+        if args.mode in ('train_final_stage'):
             edge_data = io.imread(path_edge)
             edge_data = torch.from_numpy(edge_data).unsqueeze(0).unsqueeze(3)
             edge.append(edge_data)
@@ -87,7 +88,7 @@ def preProcess_train(x ,y,args):
     input ,label = input.permute(0,3,1,2).contiguous().float().cuda() , label.permute(0,3,1,2).contiguous().float().cuda()
     input ,label = crop(input,args.crop_edge_size), crop(label, args.crop_edge_size)
 
-    if args.mode in ('train_second_stage' , 'generate_voronoi', 'train_final_stage'):
+    if args.mode in ('train_final_stage'):
         edge_data = torch.cat(edge)
         edge_data = edge_data.permute(0,3,1,2).contiguous().float().cuda()
         edge_data = crop(edge_data,args.crop_edge_size)
@@ -97,6 +98,7 @@ def preProcess_train(x ,y,args):
             edge_data[edge_data ==0 ]=2
             edge_data[edge_data==255] =0
             edge_data[edge_data==120] =1
+            assert int(torch.max(edge_data))<3, f"path: {path_edge}. edge_data:{torch.unique(edge_data)}"
             return input, label, edge_data
         return input,label/255,edge_data/255
 
@@ -150,6 +152,10 @@ def trainer_selfsupervised(EPOCH,args,model, loss_func, optimizer):
         loss_mean = sum(loss_list) / len(loss_list)
         writer.add_scalar('train/mean_loss', loss_mean, epoch)
         print(F'loss:{loss_mean}')
+
+        if (epoch + 1) % args.test_interval == 0:
+
+            save_model(model.state_dict(), epoch, 'self_stage')
 
 def trainer_selfsupervised_contrastive(EPOCH,args,model, loss_func, optimizer):
     for epoch in range(EPOCH):
@@ -291,57 +297,44 @@ def trainer_second_stage(EPOCH,args,model, loss_func, optimizer):
     for epoch in range(EPOCH):
         print(F'--EPOCH : {epoch} ')
         loss_list = []
-        loss_seg =[]
-        loss_edge = []
+
         loader = data.get_monuseg(epoch, args)  # 十折交叉验证
         model.train()
 
         for x, y in tqdm(loader.train_loader, desc='trianing'):
-            x, y ,edge = preProcess_train(x, y , args)
-            io.imsave('try0.png',x[0].cpu().permute(1,2,0).numpy().astype('uint8'))
-            io.imsave('try1.png',(y[0]*255).cpu().permute(1,2,0).numpy().astype('uint8'))
-            io.imsave('try2.png',(edge[0]*120).cpu().permute(1,2,0).numpy().astype('uint8'))
+            x, y = preProcess_train(x, y , args)
+
 
             x = transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))(x/255)
 
-            '''
-            path = r'/data2/chenpy/point_seg/Public_MoNuSeg/data_second_stage_train/TCGA-XS-A8TJ-01Z-00-DX1_original.png'
-            x = io.imread(path)
-            x = torch.from_numpy(x).unsqueeze(0).permute(0,3,1,2).contiguous().float().cuda()
-            path = r'/data2/chenpy/point_seg/Public_MoNuSeg/data_second_stage_train/TCGA-XS-A8TJ-01Z-00-DX1_pos.png'
-            y = io.imread(path)
-            y = torch.from_numpy(y).unsqueeze(0).unsqueeze(3).permute(0,3,1,2).contiguous().float().cuda()
-            '''
-            output = model(x)
 
+            output = model(x)
+            output = crop(output,args.crop_edge_size)
             prob_maps = F.softmax(output,dim=1)
             log_prob_maps = F.log_softmax(prob_maps, dim=1)
 
 
             loss1 = loss_func(log_prob_maps,y.long().squeeze(1))
-            loss2 = loss_func(log_prob_maps,edge.long().squeeze(1))
 
 
-            loss_all = loss1 + 1.5 * loss2
+
+            loss_all = loss1
 
             optimizer.zero_grad()
             loss_all.backward()
             optimizer.step()
 
             loss_list.append(loss_all)
-            loss_seg.append(loss1)
-            loss_edge.append(loss2)
+
 
 
         loss_mean = sum(loss_list) / len(loss_list)
-        loss_seg_mean = sum(loss_seg)/len(loss_seg)
-        loss_edge_mean = sum(loss_edge)/len(loss_edge)
-        writer.add_scalar('train/mean_loss', loss_mean, epoch)
-        writer.add_scalar('train/mean_seg_loss', loss_seg_mean, epoch)
-        writer.add_scalar('train/mean_edge_loss', loss_edge_mean, epoch)
-        print(F'seg_loss: {loss_seg_mean}, edge_loss: {loss_edge_mean}, all_loss: {loss_mean}')
 
-        if (epoch + 1) % args.test_interval == 0:
+        writer.add_scalar('train/mean_loss', loss_mean, epoch)
+
+        print(F'loss: {loss_mean}')
+
+        if (epoch + 1) % args.test_interval == 0 and (epoch+1)>1:
 
             print('validating:')
             print('-----------------------')
@@ -356,7 +349,7 @@ def trainer_second_stage(EPOCH,args,model, loss_func, optimizer):
                     x= transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(x1/255)
 
                     output = model(x)
-
+                    output = crop(output, args.crop_edge_size)
                     prob_maps = F.softmax(output, dim=1)
                     pred = np.argmax(prob_maps.cpu(), axis=1)
 
@@ -364,20 +357,21 @@ def trainer_second_stage(EPOCH,args,model, loss_func, optimizer):
                     for i in range(pred.shape[0]):
                         path = '/'.join(args.data_train.split('/')[:-1]) + '/data_second_stage_test/' + y0[i]
                         label = io.imread(path)
+                        label = crop(np.asarray([[label]]), args.crop_edge_size)[0, 0, :, :]
                         metric = metrics.compute_metrics(pred[i],label/255,['p_F1','aji','iou'])
-                        #cv2.imwrite('./show2/' + x0[i],pred[i].cpu().numpy()*255)
                         '''
-                        point_list = peak_point(prob_maps.cpu()[i][1].numpy(),20)
-                        
-                        
-                        #generate voronoilabel
-                        voronoi_label = create_Voronoi_label(point_list,label.shape)
+                        point_list = peak_point(prob_maps.cpu()[i][1].numpy(), 20)
+
+                        # generate voronoilabel
+                        voronoi_label = create_Voronoi_label(point_list, label.shape)
                         cv2.imwrite('./show/' + x0[i].split('_')[-2] + '_vor.png', voronoi_label)
 
-                        fig_for_save = x1[i].cpu().permute(1,2,0).contiguous().numpy()
+                        fig_for_save = x1[i].cpu().permute(1, 2, 0).contiguous().numpy()
                         for j in range(point_list.shape[0]):
-                            cv2.line(fig_for_save, (point_list[j][1]-3,point_list[j][0]),(point_list[j][1]+3,point_list[j][0]),color=(0,0,255),thickness=1)
-                            cv2.line(fig_for_save, (point_list[j][1], point_list[j][0]-3), (point_list[j][1], point_list[j][0]+3),color=(0,0,255),thickness=1)
+                            cv2.line(fig_for_save, (point_list[j][1] - 3, point_list[j][0]),
+                                     (point_list[j][1] + 3, point_list[j][0]), color=(0, 0, 255), thickness=1)
+                            cv2.line(fig_for_save, (point_list[j][1], point_list[j][0] - 3),
+                                     (point_list[j][1], point_list[j][0] + 3), color=(0, 0, 255), thickness=1)
 
                         cv2.imwrite('./show/' + x0[i], fig_for_save)
                         '''
@@ -401,7 +395,119 @@ def trainer_second_stage(EPOCH,args,model, loss_func, optimizer):
 
         writer.add_scalar('lr', optimizer.get_lr(), epoch)
         optimizer.schedule()
-    save_model(best_model, best_epoch, args.model)
+    save_model(best_model, best_epoch, 'second_stage')
+
+    print(f'best-epoch: {best_epoch}, aji: {best_aji}')
+
+def trainer_final_stage(EPOCH,args,model, loss_func, optimizer):
+    best_aji = 0
+    best_epoch = 0
+    best_model = 0
+
+    for epoch in range(EPOCH):
+        print(F'--EPOCH : {epoch} ')
+        loss_list = []
+        loss_seg =[]
+        loss_edge = []
+        loader = data.get_monuseg(epoch, args)  # 十折交叉验证
+        model.train()
+
+        for x, y in tqdm(loader.train_loader, desc='trianing'):
+            x, y, edge = preProcess_train(x, y , args)
+
+
+            x = transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))(x/255)
+
+
+            output = model(x)
+            output = crop(output,args.crop_edge_size)
+            prob_maps = F.softmax(output, dim=1)
+            log_prob_maps = F.log_softmax(prob_maps, dim=1)
+
+            loss1 = loss_func(log_prob_maps, y.long().squeeze(1))
+            loss2 = loss_func(log_prob_maps, edge.long().squeeze(1))
+
+            loss_all = loss1 + 1.5 * loss2
+
+
+            optimizer.zero_grad()
+            loss_all.backward()
+            optimizer.step()
+
+            loss_list.append(loss_all)
+            loss_seg.append(loss1)
+            loss_edge.append(loss2)
+
+        loss_mean = sum(loss_list) / len(loss_list)
+        loss_seg_mean = sum(loss_seg) / len(loss_seg)
+        loss_edge_mean = sum(loss_edge) / len(loss_edge)
+
+        writer.add_scalar('train/mean_loss', loss_mean, epoch)
+
+        print(F'loss: {loss_mean}')
+
+        if (epoch + 1) % args.test_interval == 0 and (epoch+1) >9:
+
+            print('validating:')
+            print('-----------------------')
+            model.eval()
+            with torch.no_grad():
+                loss_list = []
+
+                dic=[]
+
+                for x0, y0 in tqdm(loader.test_loader, desc='testing'):
+                    x1,y = preProcess_test(x0, y0, args)
+                    x= transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(x1/255)
+
+                    output = model(x)
+                    output = crop(output, args.crop_edge_size)
+                    prob_maps = F.softmax(output, dim=1)
+                    pred = np.argmax(prob_maps.cpu(), axis=1)
+
+
+                    for i in range(pred.shape[0]):
+                        path = '/'.join(args.data_train.split('/')[:-1]) + '/data_second_stage_test/' + y0[i]
+                        label = io.imread(path)
+                        label = crop(np.asarray([[label]]), args.crop_edge_size)[0,0,:,:]
+                        metric = metrics.compute_metrics(pred[i],label/255,['p_F1','aji','iou'])
+                        '''
+                        point_list = peak_point(prob_maps.cpu()[i][1].numpy(), 20)
+
+                        # generate voronoilabel
+                        voronoi_label = create_Voronoi_label(point_list, label.shape)
+                        cv2.imwrite('./show/' + x0[i].split('_')[-2] + '_vor.png', voronoi_label)
+
+                        fig_for_save = x1[i].cpu().permute(1, 2, 0).contiguous().numpy()
+                        for j in range(point_list.shape[0]):
+                            cv2.line(fig_for_save, (point_list[j][1] - 3, point_list[j][0]),
+                                     (point_list[j][1] + 3, point_list[j][0]), color=(0, 0, 255), thickness=1)
+                            cv2.line(fig_for_save, (point_list[j][1], point_list[j][0] - 3),
+                                     (point_list[j][1], point_list[j][0] + 3), color=(0, 0, 255), thickness=1)
+
+                        cv2.imwrite('./show/' + x0[i], fig_for_save)
+                        '''
+                        dic.append(metric)
+
+
+                for key in dic[0].keys():
+                    num = sum([i[key] for i in dic ])/len(dic)
+                    var = np.var(np.array([i[key] for i in dic ]))
+                    print(F'{key}: {num} var: {var}')
+                    writer.add_scalar(F'{key}',num,epoch)
+
+                    if key== 'aji':
+                        if num>best_aji:
+                            best_aji=num
+                            best_epoch = epoch
+                            import copy
+                            best_model = copy.deepcopy(model.state_dict())
+                #loss_mean = sum(loss_list) / len(loss_list)
+                #.add_scalar('val/mean_loss', loss_mean, epoch)
+
+        writer.add_scalar('lr', optimizer.get_lr(), epoch)
+        optimizer.schedule()
+    save_model(best_model, best_epoch, 'second_stage')
 
     print(f'best-epoch: {best_epoch}, aji: {best_aji}')
 
@@ -413,14 +519,15 @@ def test_stage(EPOCH, args, model):
         x = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(x1 / 255)
 
         output = model(x)
-
+        output = crop(output, args.crop_edge_size)
         prob_maps = F.softmax(output, dim=1)
         pred = np.argmax(prob_maps.detach().cpu(), axis=1)
 
         for i in range(pred.shape[0]):
             path = '/'.join(args.data_train.split('/')[:-1]) + '/data_second_stage_test/' + y0[i].replace('binary','gt')
             label = y[i].squeeze(0).cpu().numpy().astype(np.uint8)
-            #metric = metrics.compute_metrics(pred[i], label / 255, ['p_F1', 'aji', 'iou'])
+            label = crop(np.asarray([[label]]), args.crop_edge_size)[0, 0, :, :]
+            metric = metrics.compute_metrics(pred[i], label / 255, ['p_F1', 'aji', 'iou'])
 
             img_save = pred[i].detach().cpu().numpy().astype(np.uint8)
             img_save_label = skimage.measure.label(img_save)
@@ -438,13 +545,13 @@ def test_stage(EPOCH, args, model):
             cv2.imwrite('./show2/' + x0[i].replace('tif','png'), img_save)
             cv2.imwrite('./show2/' + x0[i].replace('.tif','_label.png'), label_save)
             cv2.imwrite('./show2/' + x0[i].replace('.tif','_gt.png'),x1[i].permute(1,2,0).detach().cpu().numpy().astype(np.uint8))
-            #dic.append(metric)
-    '''
+            dic.append(metric)
+
     for key in dic[0].keys():
         num = sum([i[key] for i in dic]) / len(dic)
         var = np.var(np.array([i[key] for i in dic]))
         print(F'{key}: {num} var: {var}')
-    '''
+
 
 
 def generate_voronoi_label( args, model):
@@ -455,10 +562,11 @@ def generate_voronoi_label( args, model):
             if sub_loader == loader.test_loader:
                 x1,y = preProcess_test(x0,y0,args)
             else:
-                x1, y ,edge = preProcess_train(x0, y0, args)
+                x1, y  = preProcess_train(x0, y0, args)
             x = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(x1 / 255)
 
             output = model(x)
+            output = crop(output, args.crop_edge_size)
 
             prob_maps = F.softmax(output, dim=1)
             pred = np.argmax(prob_maps.cpu().detach().numpy(), axis=1)
@@ -478,11 +586,11 @@ def generate_voronoi_label( args, model):
                    point_list = np.random.randint(0,255,(4,2))
                 voronoi_label = create_Voronoi_label(point_list, label.shape)
                 if sub_loader == loader.test_loader:
-                    cv2.imwrite('../Public_MoNuSeg/' +'data_second_stage_test/' + x0[i].split('_')[-2] + '_vor.png', voronoi_label)
+                    cv2.imwrite('data_second_stage_test/' + x0[i].split('_')[-2] + '_vor.png', voronoi_label)
 
 
                 else:
-                    cv2.imwrite('../Public_MoNuSeg/' +'data_second_stage_train/' + x0[i].split('_')[-2] + '_vor.png', voronoi_label)
+                    cv2.imwrite('data_second_stage_train/' + x0[i].split('_')[-2] + '_vor.png', voronoi_label)
 
 
                 fig_for_save = x1[i].cpu().permute(1, 2, 0).contiguous().numpy()
@@ -492,6 +600,8 @@ def generate_voronoi_label( args, model):
                     cv2.line(fig_for_save, (point_list[j][1], point_list[j][0] - 3),
                              (point_list[j][1], point_list[j][0] + 3), color=(0, 0, 255), thickness=1)
 
+                if not os.path.exists('./share'):
+                    os.mkdir('./share')
                 cv2.imwrite('./share/' + x0[i].split('_')[-2] + '_point.png' , fig_for_save)
                 cv2.imwrite('./share/' + x0[i].split('_')[-2] + '_prob.png' , prob*200)
 
@@ -553,13 +663,13 @@ def fully_supervised(EPOCH, args, model,optimizer,loss_func):
 
 if __name__ == "__main__":
     #loader = data.Data(args)
-
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
     #if args.check_path:
      #   model.load_state_dict(torch.load(args.check_path))
     if args.mode == 'train_base':
         args.batch_size=1
-        model = timm.create_model('res2net101_26w_4s', pretrained=False).cuda()
+        model = timm.create_model('res2net101_26w_4s', num_classes=1,pretrained=False).cuda()
         optimizer = make_optimizer(args, model)
         loss_func = nn.MSELoss()
         model.train()
@@ -603,7 +713,7 @@ if __name__ == "__main__":
         print('-----------------------')
         model = timm.create_model('res2net101_26w_4s', num_classes=1,pretrained=True).cuda()
 
-        model.load_state_dict(torch.load(args.model))
+        model.load_state_dict(torch.load('./checkpoint_monu/self_stage_best.pth'))
         optimizer = make_optimizer(args, model)
 
         loader = data.get_monuseg(0, args)
@@ -646,34 +756,29 @@ if __name__ == "__main__":
 
     elif args.mode == 'generate_voronoi':
         model = ResUNet34(pretrained=True).cuda()
-        model.load_state_dict(torch.load('/data2/chenpy/point_seg/self_supervised_seg/checkpoint_monu/net_19.pth'))
+        model.load_state_dict(torch.load('./checkpoint_monu/second_stage_3.pth'))
         generate_voronoi_label(args, model)
 
     elif args.mode == 'train_final_stage':
         model = ResUNet34(pretrained=True).cuda()
         optimizer = make_optimizer(args, model)
         loss_func = torch.nn.NLLLoss(ignore_index=2).cuda()
-        trainer_second_stage(EPOCH, args, model, loss_func, optimizer)
+        trainer_final_stage(EPOCH, args, model, loss_func, optimizer)
 
     elif args.mode == 'test':
         model = ResUNet34(pretrained=True).cuda()
-        best_path = '/data2/chenpy/point_seg/self_supervised_seg/checkpoint_monu/beta=infinity.pth'
+        best_path = args.model
         model.load_state_dict(torch.load(best_path))
         model.eval()
         test_stage(EPOCH, args, model)
 
     elif args.mode == 'fully-supervised':
         model = ResUNet34(pretrained=True).cuda()
-        #model = VisionTransformer(CONFIGS['R50-ViT-B_16'],img_size=256).cuda()
-        #model = UNet(n_channels=3,n_classes=2).cuda()
-        #model = DeepLab(num_classes=2).cuda()
-        #best_path = '/data2/chenpy/point_seg/self_supervised_seg/checkpoint/final_stage_net_aji: 0.5213.pth'
-        #model.load_state_dict(torch.load(best_path))
         optimizer = make_optimizer(args, model)
         loss_func = torch.nn.NLLLoss(ignore_index=2).cuda()
         model.train()
         fully_supervised(EPOCH, args, model,optimizer,loss_func)
 
     else:
-        raise NotImplementedError(F"process mode  be train/tes, not {args.mode}.")
+        raise NotImplementedError(F"process not found {args.mode}.")
 

@@ -88,7 +88,7 @@ def get_monuseg(epoch, args):
         image_list = sorted([item for item in list_all if item.endswith('_original.png')])
 
         if args.mode == 'generate_voronoi':
-            anno_list = sorted([item for item in list_all if item.endswith('_pospos.png')])
+            anno_list = sorted([item for item in list_all if item.endswith('_pos.png')])
         else:
             anno_list = sorted([item for item in list_all if item.endswith('_pos.png')])
 
