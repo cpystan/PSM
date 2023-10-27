@@ -46,6 +46,12 @@ python main_monuseg.py --mode 'train_random_rotate'    #Predicting rotate
 python main_monuseg.py --mode 'train_simsiam'    #Simsiam
 python main_monuseg.py --mode 'train_mean_value'    #Predicting average pixel
 ```
+
+Checkpoint of our trained self-supervised network is provided:
+```
+Path：https://pan.baidu.com/s/1mzMGe3vSqiWgftWCaM2atg?pwd=abcd 
+Code：abcd
+```
 ### Generate Pseudo Masks
 Following the self-supervised training, we can then obtain the pseudo masks using the pre-trained model.
 ```
