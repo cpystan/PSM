@@ -713,7 +713,7 @@ if __name__ == "__main__":
         print('-----------------------')
         model = timm.create_model('res2net101_26w_4s', num_classes=1,pretrained=True).cuda()
 
-        model.load_state_dict(torch.load('./checkpoint_monu/self_stage_best.pth'))
+        model.load_state_dict(torch.load('./checkpoint/self_stage_best.pth'))
         optimizer = make_optimizer(args, model)
 
         loader = data.get_monuseg(0, args)
@@ -756,7 +756,7 @@ if __name__ == "__main__":
 
     elif args.mode == 'generate_voronoi':
         model = ResUNet34(pretrained=True).cuda()
-        model.load_state_dict(torch.load('./checkpoint_monu/second_stage_best.pth'))
+        model.load_state_dict(torch.load('./checkpoint/second_stage_best.pth'))
         generate_voronoi_label(args, model)
 
     elif args.mode == 'train_final_stage':
