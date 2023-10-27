@@ -756,7 +756,7 @@ if __name__ == "__main__":
 
     elif args.mode == 'generate_voronoi':
         model = ResUNet34(pretrained=True).cuda()
-        model.load_state_dict(torch.load('./checkpoint_monu/second_stage_3.pth'))
+        model.load_state_dict(torch.load('./checkpoint_monu/second_stage_best.pth'))
         generate_voronoi_label(args, model)
 
     elif args.mode == 'train_final_stage':
