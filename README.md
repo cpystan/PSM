@@ -48,9 +48,8 @@ python main_monuseg.py --mode 'train_mean_value'    #Predicting average pixel
 ```
 
 Checkpoint of our trained self-supervised network is provided:
-```
 [Checkpoint trained by train_base]([https://arxiv.org/abs/2308.11144](https://pan.baidu.com/s/1mzMGe3vSqiWgftWCaM2atg?pwd=abcd))  
-```
+
 ### Generate Pseudo Masks
 Following the self-supervised training, we can then obtain the pseudo masks using the pre-trained model.
 ```
